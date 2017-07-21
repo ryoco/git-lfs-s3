@@ -1,11 +1,12 @@
 module GitLfsS3
   module AwsHelpers
     def s3
-      @s3 ||= Aws::S3::Client.new({
+      @s3 ||= Aws::S3::Client.new(
         region: aws_region,
         access_key_id: aws_access_key_id,
-        secret_access_key: aws_secret_access_key
-      })
+        secret_access_key: aws_secret_access_key,
+        endpoint: endpoint
+      )
     end
 
     def bucket_name
@@ -17,11 +18,15 @@ module GitLfsS3
     end
 
     def object_data(oid)
-      bucket.object("data/#{oid}")
+      bucket.object("#{oid}")
     end
 
     def aws_region
       GitLfsS3::Application.settings.aws_region
+    end
+
+    def endpoint
+      GitLfsS3::Application.settings.aws_endpoint
     end
 
     def aws_access_key_id

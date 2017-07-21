@@ -3,11 +3,11 @@ module GitLfsS3
     class Base
       include AwsHelpers
       
-      attr_reader :req, :object
+      attr_reader :object, :aws_object
 
-      def initialize(req, object)
-        @req = req
+      def initialize(object, aws_object)
         @object = object
+        @aws_object = aws_object
       end
 
       def response

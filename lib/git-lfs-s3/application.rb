@@ -43,48 +43,60 @@ module GitLfsS3
       end
     end
 
+    def error_resp(status_code, message)
+      status(status_code)
+      resp = {
+        'message' => message,
+        'documentation_url': "https://lfs-server.com/docs/errors",
+        'request_id' => SecureRandom::uuid
+      }
+      body MultiJson.dump(resp)
+    end
+
     before { protected! }
 
     get '/' do
       "Git LFS S3 is online."
     end
 
-    get "/objects/:oid", provides: 'application/vnd.git-lfs+json' do
-      object = object_data(params[:oid])
+    post '/objects/batch', provides: 'application/vnd.git-lfs+json' do
+      params = JSON.parse(request.body.read)
 
-      if object.exists?
-        status 200
-        resp = {
-          'oid' => params[:oid],
-          'size' => object.size,
-          '_links' => {
-            'self' => {
-              'href' => File.join(settings.server_url, 'objects', params[:oid])
-            },
-            'download' => {
-              # TODO: cloudfront support
-              'href' => object_data(params[:oid]).presigned_url(:get)
-            }
+      operation = params['operation']
+      transfers = params['transfers']
+      objects = params['objects']
+
+      case operation
+        when 'download'
+          r_response = {'objects' => []}
+          r_status = 200
+          logger.debug "DOWNLOAD"
+
+          service = UploadService.service_for_download(objects)
+          service.map { |s|
+            r_response['objects'].push(s.response)
+            r_status = s.status
           }
-        }
+          status r_status
+          body MultiJson.dump(r_response)
+        when 'upload'
+          r_response = {'objects' => []}
+          r_status = 200
+          logger.debug "UPLOAD"
 
-        body MultiJson.dump(resp)
-      else
-        status 404
-        body MultiJson.dump({message: 'Object not found'})
+          service = UploadService.service_for_upload(objects)
+          service.map { |s|
+            r_response['objects'].push(s.response)
+            r_status = s.status
+          }
+          status r_status
+          body MultiJson.dump(r_response)
+        else
+          error_resp(442, "Validation error.")
       end
     end
 
-    post "/objects", provides: 'application/vnd.git-lfs+json' do
-      logger.debug headers.inspect
-      service = UploadService.service_for(request.body)
-      logger.debug service.response
-      
-      status service.status
-      body MultiJson.dump(service.response)
-    end
-
-    post '/verify', provides: 'application/vnd.git-lfs+json' do
+    post '/locks/verify', provides: 'application/vnd.git-lfs+json' do
       data = MultiJson.load(request.body.tap { |b| b.rewind }.read)
       object = object_data(data['oid'])
 

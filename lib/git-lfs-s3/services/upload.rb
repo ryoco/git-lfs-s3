@@ -7,20 +7,21 @@ module GitLfsS3
     extend self
     extend AwsHelpers
 
-    MODULES = [
-      ObjectExists,
-      UploadRequired
-    ]
-
-    def service_for(data)
-      req = MultiJson.load data.tap { |d| d.rewind }.read
-      object = object_data(req['oid'])
-
-      MODULES.each do |mod|
-        return mod.new(req, object) if mod.should_handle?(req, object)
-      end
-
-      nil
+    def service_for_download(objects)
+      mdl = ObjectExists
+      objects.map { |obj|
+        aws_obj = object_data(obj['oid'])
+        mdl.new(obj, aws_obj) if mdl.should_handle?(obj, aws_obj) 
+      }.compact
     end
+
+    def service_for_upload(objects)
+      mdl = UploadRequired
+      objects.map { |obj|
+        aws_obj = object_data(obj['oid'])
+        mdl.new(obj, aws_obj) if mdl.should_handle?(obj, aws_obj) 
+      }.compact
+    end
+
   end
 end

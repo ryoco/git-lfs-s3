@@ -1,36 +1,33 @@
 module GitLfsS3
   module UploadService
     class UploadRequired < Base
-      def self.should_handle?(req, object)
-        !object.exists? || object.size != req['size']
+      def self.should_handle?(object, aws_object)
+        !aws_object.exists? || aws_object.size != object['size']
       end
 
       def response
         {
-          '_links' => {
-            'upload' => {
-              'href' => upload_destination,
-              'header' => upload_headers
-            },
-            'verify' => {
-              'href' => File.join(server_url, 'verify')
+          'oid': aws_object.key,
+          'size': object['size'],
+          'actions': {
+            'upload': {
+              'href': aws_object.presigned_url(:put),
+              'header' => upload_headers,
+              'expires_at': (Time.now + 900).iso8601,
+              'expires_in': 900,
             }
           }
         }
       end
 
       def status
-        202
+        200
       end
 
       private
 
-      def upload_destination
-        object.presigned_url(:put)
-      end
-
       def upload_headers
-        {'content-type' => ''}
+        nil
       end
     end
   end
